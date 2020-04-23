@@ -39,11 +39,13 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
         const results = await Promise.all(requests)
         var wantedData = [];
         results.forEach(result=> {
-            let x = result.participantIdentities.participantId;
-            x.forEach(particId => {
+            wantedData.push(result.teams.win);
+            for(i = 0; i < 10; i++)
+            {
+                let particId = result.participantIdentities[i].participantId;
                 wantedData.push(particId);
                 wantedData.push(result.participantIdentities.player.summonerName);
-                wantedData.push(result.teams.win);
+                
                 wantedData.push(result.participants.spell1Id);
                 wantedData.push(result.participants.spell2Id);
                 wantedData.push(result.participants.kills);
@@ -51,7 +53,8 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                 wantedData.push(result.participants.assists);
                 wantedData.push(result.participants.championId);
                 wantedData.push('----------------Maad & Yusuf & Ayham Kaka--------------------');
-            })
+            }
+           
        })
         console.log(results)
         response.send(results);
