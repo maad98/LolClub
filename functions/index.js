@@ -50,7 +50,7 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                 wantedData.push(result.participants.deaths);
                 wantedData.push(result.participants.assists);
                 wantedData.push(result.participants.championId);
-                wantedData.push('-----dsadadad32rfesdvdh--------------------------------------');
+                wantedData.push('----------------Maad Kaka--------------------');
             })
            
        })
