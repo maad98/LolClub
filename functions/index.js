@@ -52,7 +52,6 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                 wantedData.push(result.participants.championId);
                 wantedData.push('----------------Maad Kaka--------------------');
             })
-           
        })
         console.log(results)
         response.send(results);
