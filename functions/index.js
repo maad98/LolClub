@@ -1,7 +1,7 @@
 const functions = require('firebase-functions');
 
 const { Kayn, REGIONS } = require('kayn');
-const apiKey = 'RGAPI-9197a94a-5a17-422a-aafb-1dba9bd50b72';
+const apiKey = 'RGAPI-7f543a24-6fff-4c26-bbe3-fbac20d3cb95';
 
 const kayn = Kayn(apiKey)({
     region: REGIONS.NORTH_AMERICA,
@@ -30,6 +30,9 @@ const kayn = Kayn(apiKey)({
 
 
 exports.getHistory = functions.https.onRequest(async(request, response) => {
+        var givenSummName = request.query.summonerName;
+        var givenServer = request.query.server;
+        
         const { accountId } = await kayn.Summoner.by.name('Eyta')
         const { matches } = await kayn.Matchlist.by
             .accountID(accountId)
@@ -38,26 +41,39 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
         const requests = gameIds.map(kayn.Match.get)
         const results = await Promise.all(requests)
         var wantedData = [];
+        console.log(wantedData)
         results.forEach(result=> {
-            wantedData.push(result.teams.win);
+            
             for(i = 0; i < 10; i++)
             {
-                let particId = result.participantIdentities[i].participantId;
-                wantedData.push(particId);
-                wantedData.push(result.participantIdentities.player.summonerName);
+                if(result.participantIdentities[i].player.summonerName === 'Eyta')
+                {
+                    if(result.participants[i].participantId > 5)
+                    {
+                        wantedData.push(result.teams[1].win);
+                    }
+                    else
+                    {
+                        wantedData.push(result.teams[0].win);
+                    }
+                    wantedData.push(result.gameCreation);
+                    wantedData.push(result.gameDuration);
+                    wantedData.push(result.participantIdentities[i].player.summonerName);
+                    wantedData.push(result.participants[i].spell1Id);
+                    wantedData.push(result.participants[i].spell2Id);
+                    wantedData.push(result.participants[i].stats.kills);
+                    wantedData.push(result.participants[i].stats.deaths);
+                    wantedData.push(result.participants[i].stats.assists);
+                    wantedData.push(result.participants[i].championId);
+                    wantedData.push('--------------------------------------------------------');
+                    break;
+                }
                 
-                wantedData.push(result.participants.spell1Id);
-                wantedData.push(result.participants.spell2Id);
-                wantedData.push(result.participants.kills);
-                wantedData.push(result.participants.deaths);
-                wantedData.push(result.participants.assists);
-                wantedData.push(result.participants.championId);
-                wantedData.push('----------------Maad & Yusuf & Ayham Kaka--------------------');
             }
            
        })
-        console.log(results)
-        response.send(results);
+       
+        response.send(wantedData);
         
 
     });
