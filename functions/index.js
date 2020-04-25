@@ -1,7 +1,7 @@
 const functions = require('firebase-functions');
 
 const { Kayn, REGIONS } = require('kayn');
-const apiKey = 'RGAPI-7f543a24-6fff-4c26-bbe3-fbac20d3cb95';
+const apiKey = 'RGAPI-c0810f8f-9ad1-4545-bc6c-2e78cccd40c0';
 
 const kayn = Kayn(apiKey)({
     region: REGIONS.NORTH_AMERICA,
@@ -28,49 +28,83 @@ const kayn = Kayn(apiKey)({
     },
 })
 
-///var givenServer = request.query.server;
+
+
 exports.getHistory = functions.https.onRequest(async(request, response) => {
-        let givenSummName = request.query.name;
+        let givenSummName = request.query.name || 'Eyta';
+        let givenServer=request.query.server || 'na';
         givenSummName =encodeURI(givenSummName);
         const { accountId } = await kayn.Summoner.by.name(givenSummName)
         const { matches } = await kayn.Matchlist.by
             .accountID(accountId)
-            .query({ queue: 420 })
+            .query({ queue: 420  })
         const gameIds = matches.slice(0, 10).map(({ gameId }) => gameId)
         const requests = gameIds.map(kayn.Match.get)
         const results = await Promise.all(requests)
-        let wantedData = [];
+        var wantedData = [];
+        try{
         results.forEach(result=> {
-            
             for(i = 0; i < 10; i++)
             {
-                if(result.participantIdentities[i].player.summonerName === givenSummName)
+                if(result.participantIdentities[i].player.summonerName === givenSummName.toString())
                 {
-                    if(result.participants[i].participantId > 5)
-                    {
-                        wantedData.push(result.teams[1].win);
-                    }
-                    else
-                    {
-                        wantedData.push(result.teams[0].win);
-                    }
-                    wantedData.push(result.gameCreation);
-                    wantedData.push(result.gameDuration);
-                    wantedData.push(result.participantIdentities[i].player.summonerName);
-                    wantedData.push(result.participants[i].spell1Id);
-                    wantedData.push(result.participants[i].spell2Id);
-                    wantedData.push(result.participants[i].stats.kills);
-                    wantedData.push(result.participants[i].stats.deaths);
-                    wantedData.push(result.participants[i].stats.assists);
-                    wantedData.push(result.participants[i].championId);
-                    wantedData.push('--------------------------------------------------------');
+                    let matchWantedData={
+                        name : result.participantIdentities[i].player.summonerName,
+                        win : (result.participants[i].participantId > 5) ? result.teams[1].win : result.teams[0].win,
+                        data : result.gameCreation,
+                        duration: result.gameDuration,
+                        champion: result.participants[i].championId,
+                        spell1 : result.participants[i].spell1Id,
+                        spell2 : result.participants[i].spell2Id,
+                        kills : result.participants[i].stats.kills,
+                        deaths : result.participants[i].stats.deaths,
+                        assists : result.participants[i].stats.assists,
+                    };
+                    wantedData.push(matchWantedData);
                     break;
                 }
             }
+            
        })
-        console.log(givenSummName)
+    }catch(e){console.log(e)}
         response.send(wantedData);
-        
-
     });
     
+
+
+
+    // if(result.participants[i].participantId > 5)
+    // {
+    //     //wantedData[cntr][0]=result.teams[1].win;
+    // }
+    // else
+    // {
+    //     //wantedData[cntr][0]=result.teams[0].win;
+    // }
+
+    //   wantedData[cntr][0].push(result.gameCreation);
+    //   wantedData[cntr][1].push(result.gameDuration);
+    //   wantedData[cntr][2].push(result.participantIdentities[i].player.summonerName);
+    //   wantedData[cntr][3].push(result.participants[i].spell1Id);
+    //   wantedData[cntr][4].push(result.participants[i].spell2Id);
+    //   wantedData[cntr][5].push(result.participants[i].stats.kills);
+    //   wantedData[cntr][6].push(result.participants[i].stats.deaths);
+    //   wantedData[cntr][7].push(result.participants[i].stats.assists);
+    //   wantedData[cntr][8].push(result.participants[i].championId);
+    //   wantedData[cntr][9].push('--------------------------------------------------------');
+
+
+
+
+    // wantedData[cntr][0]= (result.participants[i].participantId > 5) ? wantedData[cntr][0]=result.teams[1].win : wantedData[cntr][0]=result.teams[0].win;
+    //                 wantedData[cntr][1]=result.gameCreation;
+    //                 wantedData[cntr][2]=result.gameDuration;
+    //                 wantedData[cntr][3]=result.participantIdentities[i].player.summonerName;
+    //                 wantedData[cntr][4]=result.participants[i].spell1Id;
+    //                 wantedData[cntr][5]=result.participants[i].spell2Id;
+    //                 wantedData[cntr][6]=result.participants[i].stats.kills;
+    //                 wantedData[cntr][7]=result.participants[i].stats.deaths;
+    //                 wantedData[cntr][8]=result.participants[i].stats.assists;
+    //                 wantedData[cntr][9]=result.participants[i].championId;
+    //                 console.log('cntr is '+cntr+'   '+wantedData[cntr]);
+    //                 break;
