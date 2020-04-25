@@ -28,25 +28,23 @@ const kayn = Kayn(apiKey)({
     },
 })
 
-
+///var givenServer = request.query.server;
 exports.getHistory = functions.https.onRequest(async(request, response) => {
-        var givenSummName = request.query.summonerName;
-        var givenServer = request.query.server;
-        
-        const { accountId } = await kayn.Summoner.by.name('Eyta')
+        let givenSummName = request.query.name;
+        givenSummName =encodeURI(givenSummName);
+        const { accountId } = await kayn.Summoner.by.name(givenSummName)
         const { matches } = await kayn.Matchlist.by
             .accountID(accountId)
             .query({ queue: 420 })
         const gameIds = matches.slice(0, 10).map(({ gameId }) => gameId)
         const requests = gameIds.map(kayn.Match.get)
         const results = await Promise.all(requests)
-        var wantedData = [];
-        console.log(wantedData)
+        let wantedData = [];
         results.forEach(result=> {
             
             for(i = 0; i < 10; i++)
             {
-                if(result.participantIdentities[i].player.summonerName === 'Eyta')
+                if(result.participantIdentities[i].player.summonerName === givenSummName)
                 {
                     if(result.participants[i].participantId > 5)
                     {
@@ -68,11 +66,9 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                     wantedData.push('--------------------------------------------------------');
                     break;
                 }
-                
             }
-           
        })
-       
+        console.log(givenSummName)
         response.send(wantedData);
         
 
