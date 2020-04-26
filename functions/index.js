@@ -1,7 +1,7 @@
 const functions = require('firebase-functions');
 
 const { Kayn, REGIONS } = require('kayn');
-const apiKey = 'RGAPI-8cbffa00-207a-45a1-b6ca-589f8e704109';
+const apiKey = 'RGAPI-34175a01-cc9c-47ff-ba91-c0367b62c7e0';
 
 const kayn = Kayn(apiKey)({
     region: REGIONS.NORTH_AMERICA,
@@ -15,7 +15,7 @@ const kayn = Kayn(apiKey)({
         shouldRetry: true,
         numberOfRetriesBeforeAbort: 3,
         delayBeforeRetry: 1000,
-        burst: false,
+        burst: true,
         shouldExitOn403: false,
     },
     cacheOptions: {
@@ -32,8 +32,7 @@ const kayn = Kayn(apiKey)({
 
 exports.getHistory = functions.https.onRequest(async(request, response) => {
         let givenSummName = request.query.name || 'Eyta';
-        let givenServer=request.query.server || 'na';
-        givenSummName =encodeURI(givenSummName);
+        let givenServer=request.query.server || 'na1';
         const { accountId } = await kayn.Summoner.by.name(givenSummName)
         const { matches } = await kayn.Matchlist.by
             .accountID(accountId)
@@ -48,6 +47,9 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
             {
                 if(result.participantIdentities[i].player.summonerName === givenSummName.toString())
                 {
+                    let totalMinions = result.participants[i].stats.totalMinionsKilled +
+                    result.participants[i].stats.neutralMinionsKilled;
+                   
                     let matchWantedData={
                         name : result.participantIdentities[i].player.summonerName,
                         win : (result.participants[i].participantId > 5) ? result.teams[1].win : result.teams[0].win,
@@ -60,9 +62,9 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                         kills : result.participants[i].stats.kills,
                         deaths : result.participants[i].stats.deaths,
                         assists : result.participants[i].stats.assists,
+                        minions: totalMinions,
+                        vision: result.participants[i].stats.visionScore,
                         //KP
-                        //Gold
-                        //CS
                     };
                     wantedData.push(matchWantedData);
                     break;
@@ -72,6 +74,7 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
        })
     }catch(e){console.log(e)}
         response.send(wantedData);
+       
     });
     
    
