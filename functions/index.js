@@ -33,7 +33,8 @@ const kayn = Kayn(apiKey)({
 exports.getHistory = functions.https.onRequest(async(request, response) => {
         let givenSummName = request.query.name || 'Eyta';
         let givenServer=request.query.server || 'na1';
-        const { accountId } = await kayn.Summoner.by.name(givenSummName)
+        let givenRegion=getRegion(givenServer);
+        const { accountId } = await kayn.Summoner.by.name(givenSummName).region(givenRegion);
         const { matches } = await kayn.Matchlist.by
             .accountID(accountId)
             .query({ queue: [420, 440]  })
@@ -78,3 +79,41 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
     });
     
    
+
+function getRegion(givenServer){
+    switch(givenServer) {
+        case 'euw':
+          return REGIONS.EUROPE_WEST;
+          break;
+        case 'na':
+          return REGIONS.NORTH_AMERICA;
+          break;
+        case 'eune':
+          return REGIONS.EUROPE;
+          break;
+        case 'oce':
+          return REGIONS.OCEANIA;
+          break;
+        case 'oce':
+          return REGIONS.OCEANIA;
+          break;
+        case 'br':
+          return REGIONS.BRAZIL;
+          break;
+        case 'las':
+          return REGIONS.LATIN_AMERICA_SOUTH;
+          break;
+        case 'lan':
+          return REGIONS.TURKEY;
+          break;
+        case 'ru' :
+          return REGIONS.RUSSIA;
+          break;
+        case 'jp' :
+          return REGIONS.JAPAN;
+          break;
+        case 'kr':
+          return REGIONS.KOREA;
+          break;
+      }
+}
