@@ -32,7 +32,7 @@ const kayn = Kayn(apiKey)({
 
 exports.getHistory = functions.https.onRequest(async(request, response) => {
         let givenSummName = request.query.name || 'Eyta';
-        let givenServer=request.query.server || 'na1';
+        let givenServer=request.query.server || 'na';
         let givenRegion=getRegion(givenServer);
         const { accountId } = await kayn.Summoner.by.name(givenSummName).region(givenRegion);
         const { matches } = await kayn.Matchlist.by
@@ -66,6 +66,7 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                         minions: totalMinions,
                         vision: result.participants[i].stats.visionScore,
                         //KP
+                        
                     };
                     wantedData.push(matchWantedData);
                     break;
@@ -75,45 +76,48 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
        })
     }catch(e){console.log(e)}
         response.send(wantedData);
+     //  response.send(results);
        
     });
     
    
 
-function getRegion(givenServer){
+ function getRegion(givenServer){
     switch(givenServer) {
         case 'euw':
           return REGIONS.EUROPE_WEST;
-          break;
+
         case 'na':
           return REGIONS.NORTH_AMERICA;
-          break;
+
         case 'eune':
           return REGIONS.EUROPE;
-          break;
+
         case 'oce':
           return REGIONS.OCEANIA;
-          break;
-        case 'oce':
-          return REGIONS.OCEANIA;
-          break;
+
         case 'br':
           return REGIONS.BRAZIL;
-          break;
+
         case 'las':
           return REGIONS.LATIN_AMERICA_SOUTH;
-          break;
-        case 'lan':
+
+        case 'tur':
           return REGIONS.TURKEY;
-          break;
+         
+        case 'lan':
+          return REGIONS.LATIN_AMERICA_NORTH;
+         
         case 'ru' :
           return REGIONS.RUSSIA;
-          break;
+         
         case 'jp' :
           return REGIONS.JAPAN;
-          break;
+          
         case 'kr':
           return REGIONS.KOREA;
-          break;
+         
+        default: return REGIONS.NORTH_AMERICA;
+       
       }
 }
