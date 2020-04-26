@@ -1,10 +1,19 @@
 const functions = require('firebase-functions');
 
-const { Kayn, REGIONS } = require('kayn');
-const apiKey = 'RGAPI-34175a01-cc9c-47ff-ba91-c0367b62c7e0';
+var admin = require("firebase-admin");
 
-const kayn = Kayn(apiKey)({
-    region: REGIONS.NORTH_AMERICA,
+var serviceAccount = require("./lolclub-firebase-adminsdk-px2rx-e43ef1eb4a.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://lolclub.firebaseio.com"
+});
+
+const { Kayn, REGIONS } = require('kayn');
+const apiKey = 'RGAPI-65486bbd-eb04-480c-a61b-c513fc84c9ce';
+
+let kayn = Kayn(apiKey)({
+    region: REGIONS.EUROPE_WEST,
     apiURLPrefix: 'https://%s.api.riotgames.com',
     locale: 'en_US',
     debugOptions: {
@@ -28,13 +37,15 @@ const kayn = Kayn(apiKey)({
     },
 })
 
-
-
 exports.getHistory = functions.https.onRequest(async(request, response) => {
-        let givenSummName = request.query.name || 'Eyta';
-        let givenServer=request.query.server || 'na';
+        let givenSummName = request.query.name || 'Last WarriorX';
+        let givenServer=request.query.server || 'euw';
         let givenRegion=getRegion(givenServer);
-        const { accountId } = await kayn.Summoner.by.name(givenSummName).region(givenRegion);
+        
+        console.log(givenRegion);
+
+        try{   
+        const { accountId } = await kayn.Summoner.by.name(givenSummName); 
         const { matches } = await kayn.Matchlist.by
             .accountID(accountId)
             .query({ queue: [420, 440]  })
@@ -42,7 +53,7 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
         const requests = gameIds.map(kayn.Match.get)
         const results = await Promise.all(requests)
         var wantedData = [];
-        try{
+        
         results.forEach(result=> {
             for(i = 0; i < 10; i++)
             {
@@ -55,7 +66,7 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                         name : result.participantIdentities[i].player.summonerName,
                         win : (result.participants[i].participantId > 5) ? result.teams[1].win : result.teams[0].win,
                         date : result.gameCreation,
-                        queue : result.queueId || 'none',
+                        queue : result.queueId ,
                         duration: result.gameDuration,
                         champion: result.participants[i].championId,
                         spell1 : result.participants[i].spell1Id,
@@ -66,7 +77,6 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                         minions: totalMinions,
                         vision: result.participants[i].stats.visionScore,
                         //KP
-                        
                     };
                     wantedData.push(matchWantedData);
                     break;
@@ -74,50 +84,85 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
             }
             
        })
-    }catch(e){console.log(e)}
+    }catch(e){
+        console.log(e);
+    }
         response.send(wantedData);
-     //  response.send(results);
        
     });
     
-   
-
  function getRegion(givenServer){
     switch(givenServer) {
         case 'euw':
-          return REGIONS.EUROPE_WEST;
-
+            return REGIONS.EUROPE_WEST;
         case 'na':
-          return REGIONS.NORTH_AMERICA;
-
+            return REGIONS.NORTH_AMERICA;
         case 'eune':
-          return REGIONS.EUROPE;
-
+            return REGIONS.EUROPE;
         case 'oce':
-          return REGIONS.OCEANIA;
-
+            return REGIONS.OCEANIA;
         case 'br':
-          return REGIONS.BRAZIL;
-
+            return REGIONS.BRAZIL;
         case 'las':
-          return REGIONS.LATIN_AMERICA_SOUTH;
-
+            return REGIONS.LATIN_AMERICA_SOUTH;
         case 'tur':
-          return REGIONS.TURKEY;
-         
+            return REGIONS.TURKEY;
         case 'lan':
-          return REGIONS.LATIN_AMERICA_NORTH;
-         
+            return REGIONS.LATIN_AMERICA_NORTH;        
         case 'ru' :
-          return REGIONS.RUSSIA;
-         
+            return REGIONS.RUSSIA;         
         case 'jp' :
-          return REGIONS.JAPAN;
-          
+            return REGIONS.JAPAN;         
         case 'kr':
-          return REGIONS.KOREA;
-         
-        default: return REGIONS.NORTH_AMERICA;
-       
+            return REGIONS.KOREA; 
+        default: 
+            return REGIONS.NORTH_AMERICA;
       }
 }
+
+exports.confirmIGNAndCreateUserDocument = functions.https.onRequest(async(request, response) => {
+    let givenSummName = request.query.name ;
+    let givenServer=request.query.server;
+    let givenCode=request.query.code ;
+    var id=makeid(10);
+    try{
+        var db = admin.database();
+        var ref = db.ref("/users/"+id);
+        ref.set({
+            info : {
+            ign :givenSummName,
+            server :givenServer,
+            email: 'none',
+            gender:'none',
+            mainlane:'none',
+            secondarylane:'none',
+            imageurl:'none',
+            isVerified:true,
+            isEmailVerified:false,
+            datecreated: Date.now(),
+            solorank:'none',
+            flexrank:'none',
+            friends:'none',
+            clashteams:'none',
+           }
+        });
+    }
+    catch(e){
+        console.log(e);
+    }
+    let responseBody={
+        status:200,
+        id : id,
+    };
+    response.send(responseBody);
+});
+
+function makeid(length) {
+    var result           = '';
+    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for ( var i = 0; i < length; i++ ) {
+       result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+ }
