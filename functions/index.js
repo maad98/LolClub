@@ -41,19 +41,18 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
         let givenSummName = request.query.name || 'Last WarriorX';
         let givenServer=request.query.server || 'euw';
         let givenRegion=getRegion(givenServer);
-        
         console.log(givenRegion);
-
         try{   
-        const { accountId } = await kayn.Summoner.by.name(givenSummName); 
+        const { accountId } = await kayn.Summoner.by.name(givenSummName)
+        .region(givenServer)
         const { matches } = await kayn.Matchlist.by
             .accountID(accountId)
-            .query({ queue: [420, 440]  })
+            .region(givenServer)
+            .query({ queue: [420, 440]  }) 
         const gameIds = matches.slice(0, 10).map(({ gameId }) => gameId)
-        const requests = gameIds.map(kayn.Match.get)
+        const requests = gameIds.map(kayn.Match.get).map(x => x.region(givenRegion));
         const results = await Promise.all(requests)
         var wantedData = [];
-        
         results.forEach(result=> {
             for(i = 0; i < 10; i++)
             {
@@ -61,7 +60,9 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                 {
                     let totalMinions = result.participants[i].stats.totalMinionsKilled +
                     result.participants[i].stats.neutralMinionsKilled;
-                   
+
+                    let ka = result.participants[i].stats.kills +result.participants[i].stats.assists
+
                     let matchWantedData={
                         name : result.participantIdentities[i].player.summonerName,
                         win : (result.participants[i].participantId > 5) ? result.teams[1].win : result.teams[0].win,
@@ -76,7 +77,7 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
                         assists : result.participants[i].stats.assists,
                         minions: totalMinions,
                         vision: result.participants[i].stats.visionScore,
-                        //KP
+                        kp: (result.participants[i].participantId > 5) ? Math.round(ka/getKp(result, true) * 100) : Math.round(ka/getKp(result, false)* 100)
                     };
                     wantedData.push(matchWantedData);
                     break;
@@ -90,6 +91,34 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
         response.send(wantedData);
        
     });
+
+    function getKp(result, bool)
+    {
+     // var index = (bool == true) ? 5 : 0;
+      let sum = 0;
+
+      if(bool == true)
+      {
+        for(i = 5; i < 10; i++)
+        {
+          
+          sum += result.participants[i].stats.kills;
+  
+        }
+      }
+      else
+      {
+        for(i = 0; i < 5; i++)
+        {
+          
+          sum += result.participants[i].stats.kills;
+  
+        }
+      }
+      
+      return sum;
+
+    }
     
  function getRegion(givenServer){
     switch(givenServer) {
