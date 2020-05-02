@@ -10,7 +10,7 @@ admin.initializeApp({
 });
 
 const { Kayn, REGIONS } = require('kayn');
-const apiKey = 'RGAPI-65486bbd-eb04-480c-a61b-c513fc84c9ce';
+const apiKey = 'RGAPI-94f4638f-f8e7-4138-9d63-01c99f6a0409';
 
 let kayn = Kayn(apiKey)({
     region: REGIONS.EUROPE_WEST,
@@ -92,35 +92,23 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
        
     });
 
-    function getKp(result, bool)
-    {
-     // var index = (bool == true) ? 5 : 0;
-      let sum = 0;
-
-      if(bool == true)
-      {
-        for(i = 5; i < 10; i++)
-        {
-          
+function getKp(result, flag){
+    // var index = (bool == true) ? 5 : 0;
+    let sum = 0;
+    if(flag){
+        for(i = 5; i < 10; i++){
           sum += result.participants[i].stats.kills;
-  
         }
       }
-      else
-      {
-        for(i = 0; i < 5; i++)
-        {
-          
+      else{
+        for(i = 0; i < 5; i++){
           sum += result.participants[i].stats.kills;
-  
         }
       }
-      
       return sum;
-
-    }
+}
     
- function getRegion(givenServer){
+function getRegion(givenServer){
     switch(givenServer) {
         case 'euw':
             return REGIONS.EUROPE_WEST;
@@ -150,40 +138,55 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
 }
 
 exports.confirmIGNAndCreateUserDocument = functions.https.onRequest(async(request, response) => {
-    let givenSummName = request.query.name ;
-    let givenServer=request.query.server;
-    let givenCode=request.query.code ;
-    var id=makeid(10);
+    let givenSummName = request.query.name || 'Last WarriorX';
+    let givenServer=request.query.server || 'euw';
+    let givenCode=request.query.code || '1234';
+    let id=makeid(10);
     try{
-        var db = admin.database();
-        var ref = db.ref("/users/"+id);
-        ref.set({
-            info : {
-            ign :givenSummName,
-            server :givenServer,
-            email: 'none',
-            gender:'none',
-            mainlane:'none',
-            secondarylane:'none',
-            imageurl:'none',
-            isVerified:true,
-            isEmailVerified:false,
-            datecreated: Date.now(),
-            solorank:'none',
-            flexrank:'none',
-            friends:'none',
-            clashteams:'none',
-           }
-        });
+        let isVerified=await checkCode(givenSummName,givenServer,givenCode);
+
+        if(!isVerified) //the provided code by the user is wrong
+        {
+            let responseBody={
+                status:404,
+                message : 'Unsuccessful : Wrong Code',
+            };
+            response.send(responseBody);
+        }
+        else{
+            var db = admin.database();
+            var ref = db.ref("/users/"+id);
+            ref.set({
+                info : {
+                ign :givenSummName,
+                server :givenServer,
+                email: 'none',
+                gender:'none',
+                mainlane:'none',
+                secondarylane:'none',
+                imageurl:'none',
+                isVerified:true,
+                isEmailVerified:false,
+                datecreated: Date.now(),
+                solorank:'none',
+                flexrank:'none',
+                friends:'none',
+                clashteams:'none',
+            }
+            });
+            let responseBody={
+                status:200,
+                message : 'Successful : User Created',
+                id : id,
+            };
+            response.send(responseBody);
+        }
     }
     catch(e){
         console.log(e);
+        response.send(e);
     }
-    let responseBody={
-        status:200,
-        id : id,
-    };
-    response.send(responseBody);
+    
 });
 
 function makeid(length) {
@@ -195,3 +198,112 @@ function makeid(length) {
     }
     return result;
  }
+
+ async function  checkCode (givenSummName,givenServer,givenCode){
+    
+    const { id: myID } = await kayn.Summoner.by.name(givenSummName).region(givenServer)
+
+    const code = await kayn.ThirdPartyCode.by.summonerID(myID).region(givenServer)
+    
+    console.log("the code is "+code);
+
+    console.log(code);
+
+    return code===givenCode;
+ }
+
+
+ async function getRank(givenSummName,givenServer){
+    try{
+        const { id: myID } = await kayn.Summoner.by.name(givenSummName).region(givenServer);
+        let ranksJSON=await kayn.League.Entries.by.summonerID(myID);
+        var returnBody=[];
+        ranksJSON.forEach(rank=>{
+            if(rank.queueType=='RANKED_SOLO_5x5'){
+                let rankBox={
+                    'SoloQ':{
+                        tier : rank.tier,
+                        rank : rank.rank,
+                        lp : rank.leaguePoints,
+                        wr : rank.wins/(rank.wins+rank.losses),
+                    }
+                };
+                returnBody.push(rankBox);
+            }
+            else {
+                let rankBox={
+                    'FlexQ':{
+                        tier : rank.tier,
+                        rank : rank.rank,
+                        lp : rank.leaguePoints,
+                        wr : rank.wins/(rank.wins+rank.losses),
+                    }
+                };
+                returnBody.push(rankBox);
+            }
+            
+        })
+        return returnBody;
+    }catch(e){
+        console.log(e);
+        return ('error');
+    }
+ }
+
+exports.updateProfile=functions.https.onRequest(async(request, response) => {
+    let givenID = request.query.id;
+    let givenImageUrl=request.query.url;
+    let givenMainLane=request.query.main;
+    let givenSecondaryLane=request.query.secondary;
+    let givenGender=request.query.gender;
+    console.log('the id is : '+givenID);
+    try{
+    var db = admin.database();
+    var ref = db.ref("/users/"+givenID);
+    ref.once("value").then(snapshot => {
+        if(snapshot.exists()){
+            console.log('exists');
+            ref.update({
+                "info/imageurl": givenImageUrl,
+                "info/mainlane": givenMainLane,
+                "info/secondarylane": givenSecondaryLane,
+                "info/gender": givenGender,
+                
+            });
+            let responseBody={
+                status:200,
+                message : 'Successful : all went well',
+            };
+            response.send(responseBody);
+        }
+        else{
+            let responseBody={
+                status:404,
+                message : 'Unsuccessful : ID doesnt exist',
+            };
+            response.send(responseBody);
+        }
+        return null;
+    }).catch(()=>{
+        let responseBody={
+            status:404,
+            message : 'Unsuccessful',
+        };
+        response.send(responseBody);
+    });
+    }
+    catch(e){
+        console.log(e);
+        let responseBody={
+            status:404,
+            message : 'Unsuccessful',
+        };
+        response.send(responseBody);
+    }
+});
+
+
+exports.testing=functions.https.onRequest(async(request, response) => {
+    
+        response.send(await getRank('ąkalî','euw'));
+});
