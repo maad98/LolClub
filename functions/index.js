@@ -10,7 +10,7 @@ admin.initializeApp({
 });
 
 const { Kayn, REGIONS } = require('kayn');
-const apiKey = 'RGAPI-94f4638f-f8e7-4138-9d63-01c99f6a0409';
+const apiKey = 'RGAPI-4a6b92ee-dd89-4f3e-a65b-2fcd645199a9';
 
 let kayn = Kayn(apiKey)({
     region: REGIONS.EUROPE_WEST,
@@ -138,13 +138,12 @@ function getRegion(givenServer){
 }
 
 exports.confirmIGNAndCreateUserDocument = functions.https.onRequest(async(request, response) => {
-    let givenSummName = request.query.name || 'Last WarriorX';
+    let givenSummName = request.query.name || 'LastWarriorX';
     let givenServer=request.query.server || 'euw';
     let givenCode=request.query.code || '1234';
     let id=makeid(10);
     try{
         let isVerified=await checkCode(givenSummName,givenServer,givenCode);
-
         if(!isVerified) //the provided code by the user is wrong
         {
             let responseBody={
@@ -213,42 +212,7 @@ function makeid(length) {
  }
 
 
- async function getRank(givenSummName,givenServer){
-    try{
-        const { id: myID } = await kayn.Summoner.by.name(givenSummName).region(givenServer);
-        let ranksJSON=await kayn.League.Entries.by.summonerID(myID);
-        var returnBody=[];
-        ranksJSON.forEach(rank=>{
-            if(rank.queueType=='RANKED_SOLO_5x5'){
-                let rankBox={
-                    'SoloQ':{
-                        tier : rank.tier,
-                        rank : rank.rank,
-                        lp : rank.leaguePoints,
-                        wr : rank.wins/(rank.wins+rank.losses),
-                    }
-                };
-                returnBody.push(rankBox);
-            }
-            else {
-                let rankBox={
-                    'FlexQ':{
-                        tier : rank.tier,
-                        rank : rank.rank,
-                        lp : rank.leaguePoints,
-                        wr : rank.wins/(rank.wins+rank.losses),
-                    }
-                };
-                returnBody.push(rankBox);
-            }
-            
-        })
-        return returnBody;
-    }catch(e){
-        console.log(e);
-        return ('error');
-    }
- }
+ 
 
 exports.updateProfile=functions.https.onRequest(async(request, response) => {
     let givenID = request.query.id;
@@ -258,17 +222,32 @@ exports.updateProfile=functions.https.onRequest(async(request, response) => {
     let givenGender=request.query.gender;
     console.log('the id is : '+givenID);
     try{
+    var flexBox=null;
+    var soloBox=null;
+
+    var userData=await getIGNandServerByID(givenID);
+    console.log(await userData);
+
+    var rankData=await getRank(userData.ign,userData.server);
+    console.log('rank data = ' + rankData);
+
+    rankData.forEach(rank =>{
+        if(rank.queue==='soloq')
+            soloBox=rank;
+        else
+            flexBox=rank;
+    });
     var db = admin.database();
-    var ref = db.ref("/users/"+givenID);
-    ref.once("value").then(snapshot => {
+    var ref = db.ref('/users/'+givenID);
+    ref.once('value').then(snapshot => {
         if(snapshot.exists()){
-            console.log('exists');
             ref.update({
-                "info/imageurl": givenImageUrl,
-                "info/mainlane": givenMainLane,
-                "info/secondarylane": givenSecondaryLane,
-                "info/gender": givenGender,
-                
+                'info/imageurl': givenImageUrl,
+                'info/mainlane': givenMainLane,
+                'info/secondarylane': givenSecondaryLane,
+                'info/gender': givenGender,
+                'info/solorank':soloBox!=null ? soloBox :'unranked' ,
+                'info/flexrank':flexBox!=null ? flexBox :'unranked'
             });
             let responseBody={
                 status:200,
@@ -302,8 +281,63 @@ exports.updateProfile=functions.https.onRequest(async(request, response) => {
     }
 });
 
+async function getRank(givenSummName,givenServer){
+    try{
+        const { id: myID } = await kayn.Summoner.by.name(givenSummName).region(givenServer);
+        let ranksJSON=await kayn.League.Entries.by.summonerID(myID);
+        var returnBody=[];
+        ranksJSON.forEach(rank=>{
+            if(rank.queueType==='RANKED_SOLO_5x5'){
+                let rankBox={
+                    queue : 'soloq',
+                    tier : rank.tier,
+                    rank : rank.rank,
+                    lp : rank.leaguePoints,
+                    wr : Math.round(rank.wins/(rank.wins+rank.losses)*100),
+                };
+                returnBody.push(rankBox);
+            }
+            else {
+                let rankBox={
+                    queue : 'flexq',
+                    tier : rank.tier,
+                    rank : rank.rank,
+                    lp : rank.leaguePoints,
+                    wr : Math.round(rank.wins/(rank.wins+rank.losses)*100),
+                };
+                returnBody.push(rankBox);
+            }
+        })
+        return returnBody;
+    }catch(e){
+        console.log(e);
+        return ('error');
+    }
+ }
 
 exports.testing=functions.https.onRequest(async(request, response) => {
-    
-        response.send(await getRank('ąkalî','euw'));
+    try{
+        let userData=await getIGNandServerByID('knBVNytag1');
+        console.log(userData.ign+" / "+userData.server);
+
+        let userRank=await getRank('7 Dead Lee Sins','euw');
+        console.log(userRank);
+
+        response.send(userRank);
+    }
+    catch(e){
+        response.send(e);
+    }
 });
+
+async function getIGNandServerByID(id){
+    var db = admin.database();
+    var ref = db.ref("/users/"+id+"/info/");
+    return new Promise((resolve, reject) => {
+        ref.on('value', snapshot => resolve({
+            ign : snapshot.val().ign,
+            server : snapshot.val().server,
+        }), reject)
+    })
+}
+
