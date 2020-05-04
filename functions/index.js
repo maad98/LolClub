@@ -10,7 +10,7 @@ admin.initializeApp({
 });
 
 const { Kayn, REGIONS } = require('kayn');
-const apiKey = 'RGAPI-4a6b92ee-dd89-4f3e-a65b-2fcd645199a9';
+const apiKey = 'RGAPI-06b726dc-b966-43f7-bbd8-937247f2da16';
 
 let kayn = Kayn(apiKey)({
     region: REGIONS.EUROPE_WEST,
@@ -41,6 +41,7 @@ exports.getHistory = functions.https.onRequest(async(request, response) => {
         let givenSummName = request.query.name || 'Last WarriorX';
         let givenServer=request.query.server || 'euw';
         let givenRegion=getRegion(givenServer);
+        
         console.log(givenRegion);
         try{   
         const { accountId } = await kayn.Summoner.by.name(givenSummName)
@@ -198,7 +199,7 @@ function makeid(length) {
     return result;
  }
 
- async function  checkCode (givenSummName,givenServer,givenCode){
+async function  checkCode (givenSummName,givenServer,givenCode){
     
     const { id: myID } = await kayn.Summoner.by.name(givenSummName).region(givenServer)
 
@@ -209,10 +210,8 @@ function makeid(length) {
     console.log(code);
 
     return code===givenCode;
- }
+}
 
-
- 
 
 exports.updateProfile=functions.https.onRequest(async(request, response) => {
     let givenID = request.query.id;
@@ -246,8 +245,8 @@ exports.updateProfile=functions.https.onRequest(async(request, response) => {
                 'info/mainlane': givenMainLane,
                 'info/secondarylane': givenSecondaryLane,
                 'info/gender': givenGender,
-                'info/solorank':soloBox!=null ? soloBox :'unranked' ,
-                'info/flexrank':flexBox!=null ? flexBox :'unranked'
+                'info/solorank': soloBox !== null ? soloBox :'unranked' ,
+                'info/flexrank': flexBox !== null ? flexBox :'unranked'
             });
             let responseBody={
                 status:200,
