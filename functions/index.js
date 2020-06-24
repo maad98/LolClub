@@ -11,9 +11,9 @@ admin.initializeApp({
     databaseURL: "https://lolclub.firebaseio.com"
 });
 
-const apiKey = 'RGAPI-ebcebc9b-432b-4d12-a163-b3fa6426ca3b';
+const apiKey = 'RGAPI-28251490-2aaa-4fa1-aaea-72aea6da4b88';
 
-const FRIEND_REQUEST_METHOD='friend_request';
+const FRIEND_REQUEST_METHOD = 'FRIEND_REQUEST';
 
 
 let kayn = Kayn(apiKey)({
@@ -45,13 +45,10 @@ exports.confirmIGNAndCreateUserDocument = functions.https.onRequest(async (reque
     let givenSummName = request.query.name || 'Sir Crownguard';
     let givenServer = request.query.server || 'euw';
     let givenCode = request.query.code || '1234';
-
-
     let id = await getPUUID(givenSummName, givenServer);
 
     try {
         //let isVerified=await checkCode(givenSummName,givenServer,givenCode);
-
         let isVerified = true;
         if (!isVerified) //the provided code by the user is wrong
         {
@@ -101,7 +98,6 @@ exports.confirmIGNAndCreateUserDocument = functions.https.onRequest(async (reque
                 message: 'Successful : User Created',
                 id: id,
             };
-
             response.send(responseBody);
         }
     }
@@ -109,7 +105,6 @@ exports.confirmIGNAndCreateUserDocument = functions.https.onRequest(async (reque
         console.log(e);
         response.send(e);
     }
-
 });
 
 exports.signMoreDeviceInfo = functions.https.onRequest(async (request, response) => {
@@ -189,7 +184,7 @@ exports.updateProfile = functions.https.onRequest(async (request, response) => {
 
 exports.getHistory = functions.https.onRequest(async (request, response) => {
     let givenID = request.query.id || 'n62XlnTVgvtUuj494x5zJbno9dne63Fs45TAei2Cu8QOQhoibm59dJau_gHr5gv6SvGXVryJPIqerw';
-    let givenServer = request.query.server ||'euw';
+    let givenServer = request.query.server || 'euw';
     try {
 
         let userData = await getUserInfoByID(givenID, givenServer);
@@ -237,25 +232,13 @@ exports.get10SwipesById = functions.https.onRequest(async (request, response) =>
 exports.sendFriendRequest = functions.https.onRequest(async (request, response) => {
 
     let givenServer = request.query.server || 'euw';
-    let senderID = request.query.senderID || 'i62fF3RkiU';
-    let recieverID = request.query.recieverID || 'QpkjsHSWdx';
+    let senderID = request.query.senderID || 'DoN1AMlG3CEoVjABi1sW3Yn49QcihTv9oepQu9jJjCEANXnz4txxLc23bGv-nIe-A7EYzHCd9Z4rLw';
+    let recieverID = request.query.recieverID || 'n62XlnTVgvtUuj494x5zJbno9dne63Fs45TAei2Cu8QOQhoibm59dJau_gHr5gv6SvGXVryJPIqerw';
 
     try {
         var dateCreated = getTimestampDate(Date.now());
 
         var db = admin.database();
-
-        let friendsID = senderID + "_" + recieverID;
-
-        var friendsRef = db.ref("/friends/" + givenServer + "/" + friendsID);
-
-        friendsRef.update({
-            status: 'pending',
-            senderID: senderID,
-            recieverID: recieverID,
-            sentAt: dateCreated,
-            messages: 'empty',
-        });
 
         var senderRef = db.ref("/users/" + givenServer + "/" + senderID);
         senderRef.child('pendingSentList').push().set(recieverID);
@@ -268,7 +251,27 @@ exports.sendFriendRequest = functions.https.onRequest(async (request, response) 
         let senderInfo = await getUserInfoByID(senderID, givenServer);
         let senderName = senderInfo.ign;
 
+        let senderProfileImageUrl = senderInfo.imageurl;
+
+        let friendsID = await createFriendShipAndGetFriendsID(senderID, recieverID, givenServer, dateCreated);
+
+        var timestamp = Date.now().toString();
+        var key = timestamp;
+
+        addToNotifications(recieverID, givenServer, key, {
+            expired: false,
+            key: key,
+            type: FRIEND_REQUEST_METHOD,
+            senderID: senderID,
+            timeSent: dateCreated,
+            status: 'pending',
+            ign: senderName,
+            imageUrl: senderProfileImageUrl,
+            friendsID: friendsID
+        });
+
         const fcm = admin.messaging();
+
         var payload = {
             notification: {
                 title: "Friend Request ",
@@ -276,13 +279,14 @@ exports.sendFriendRequest = functions.https.onRequest(async (request, response) 
                 clickAction: 'FlUTTER_NOTIFICATION_CLICK',
             },
             data: {
-                sound: "default", 
+                sound: "default",
                 id: senderID,
-                server : givenServer ,
-                ign : senderName,
+                server: givenServer,
+                ign: senderName,
                 method: 'FRIEND_REQUEST',
             }
         };
+
         fcm.sendToDevice(fcmToken, payload);
 
         response.send('Succesful');
@@ -343,34 +347,191 @@ exports.logIn = functions.https.onRequest(async (request, response) => {
         };
         response.send(responseBody)
     }
-    
+
 });
 
-exports.testing = functions.https.onRequest(async (request, response) => {
-    let id= 'n62XlnTVgvtUuj494x5zJbno9dne63Fs45TAei2Cu8QOQhoibm59dJau_gHr5gv6SvGXVryJPIqerw';
-    let server='euw';
-    let method=FRIEND_REQUEST_METHOD;
-    let data={
-        name: 'Hatem',
-        id : '2231',
+exports.getNotifications = functions.https.onRequest(async (request, response) => {
+    let givenID = request.query.id || 'n62XlnTVgvtUuj494x5zJbno9dne63Fs45TAei2Cu8QOQhoibm59dJau_gHr5gv6SvGXVryJPIqerw';
+    let givenServer = request.query.server || 'euw';
+    try {
+        let userNotificationData = await getUserNotificationsByID(givenID, givenServer);
+        response.send(userNotificationData);
+    }
+    catch (e) {
+        let responseBody = {
+            status: 404,
+            message: 'Unsuccessful',
+            error: e,
+        };
+        console.log(e);
+        response.send(responseBody);
+    }
+});
+
+exports.acceptFriendRequest = functions.https.onRequest(async (request, response) => {
+    let givenID = request.query.id || 'n62XlnTVgvtUuj494x5zJbno9dne63Fs45TAei2Cu8QOQhoibm59dJau_gHr5gv6SvGXVryJPIqerw';
+    let senderID = request.query.senderID || 'DoN1AMlG3CEoVjABi1sW3Yn49QcihTv9oepQu9jJjCEANXnz4txxLc23bGv-nIe-A7EYzHCd9Z4rLw';
+    let givenServer = request.query.server || 'euw';
+    let notificationKey = request.query.key || '1592379045034';
+    let friendsID = request.query.friendsID || 'rg4DA6APvC';
+    try {
+        updateNotification(givenID, givenServer, notificationKey, {
+            'expired': true,
+            'status': 'accepted',
+        });
+        updateFriends(givenServer, friendsID, {
+            'status': 'friends',
+        });
+        addToFriendList(givenServer, givenID, friendsID);
+        addToFriendList(givenServer, senderID, friendsID);
+        response.send('Succesful');
+    }
+    catch (e) {
+        console.log(e);
+        response.send(e);
     }
 
 
+});
+
+exports.rejectFriendRequest = functions.https.onRequest(async (request, response) => {
+    let givenID = request.query.id || 'n62XlnTVgvtUuj494x5zJbno9dne63Fs45TAei2Cu8QOQhoibm59dJau_gHr5gv6SvGXVryJPIqerw';
+    let senderID = request.query.senderID || 'DoN1AMlG3CEoVjABi1sW3Yn49QcihTv9oepQu9jJjCEANXnz4txxLc23bGv-nIe-A7EYzHCd9Z4rLw';
+    let givenServer = request.query.server || 'euw';
+    let notificationKey = request.query.key || '1592379045034';
+    let friendsID = request.query.friendsID || 'rg4DA6APvC';
     try {
-        
-        addToNotifications(id,server,method,data);
+        updateNotification(givenID, givenServer, notificationKey, {
+            'expired': true,
+            'status': 'rejected',
+        });
+        updateFriends(givenServer, friendsID, {
+            'status': 'rejected',
+        });
+        response.send('Succesful');
+    }
+    catch (e) {
+        console.log(e);
+        response.send(e);
+    }
+});
 
+exports.getFriendList = functions.https.onRequest(async (request, response) => {
+    let id=request.query.id || 'DoN1AMlG3CEoVjABi1sW3Yn49QcihTv9oepQu9jJjCEANXnz4txxLc23bGv-nIe-A7EYzHCd9Z4rLw';
+    let server=request.query.server || 'euw';
+    try {
+        let friendsInfoList = [];
+        friendsInfoList = await getFriendsListInfo(id, server);
+        response.send(friendsInfoList);
+    }
+    catch (e) {
+        response.send('error');
+        console.log(e);
+    }
+});
 
-        response.send(timestamp);
+exports.testing = functions.https.onRequest(async (request, response) => {
+    let id = 'n62XlnTVgvtUuj494x5zJbno9dne63Fs45TAei2Cu8QOQhoibm59dJau_gHr5gv6SvGXVryJPIqerw';
+    let server = 'euw';
+    try {
+       response.send('testing'); 
     }
     catch (e) {
         response.send(e);
     }
 });
 
+
+
+async function getFriendsListInfo(id, server) {
+    return new Promise(async (resolve, reject) => {
+        let userFriendIdsList = [];
+        let friendsInfoList = [];
+        userFriendIdsList = await getUserFriendIdsList(id, server);
+        let idsLength=userFriendIdsList.length;
+        let i =0;
+        userFriendIdsList.forEach(async friendsID => {
+            var friendsInfo = await getFriendsInfo(friendsID, server, id);  
+            friendsInfoList.push(friendsInfo);
+            i++;
+            if(i===idsLength)
+                resolve(friendsInfoList);
+        });
+    })
+}
+
+//get the friends IDS of a user
+async function getUserFriendIdsList(id, server) {
+    var db = admin.database();
+    var ref = db.ref("/users/" + server + "/" + id + "/friendList");
+    return new Promise((resolve, reject) => {
+        ref.on('value', snapshot => {
+            var friendList = [];
+            snapshot.forEach(snap => {
+                friendList.push(snap.val());
+            });
+            resolve(friendList);
+        }, reject)
+    })
+}
+
+//gets the FriendShip info
+async function getFriendsInfo(friendsID, server,userID) {
+    var db = admin.database();
+    var ref = db.ref("/friends/" + server + "/" + friendsID);
+    return new Promise((resolve, reject) => {
+        ref.on('value',async snapshot => {
+            let friendId=snapshot.val().firstUserID !== userID?snapshot.val().firstUserID:snapshot.val().secondUserID;
+            let userFriendInfo=await getUserInfoByID(friendId,server);
+            let friendsInfo ={
+                friendsID: friendsID,
+                userFriendID: friendId,
+                ign:userFriendInfo.ign,
+                imageUrl:userFriendInfo.imageurl,
+            };
+            resolve(friendsInfo);
+        }, reject)
+    })
+}
+
 async function getPUUID(ign, server) {
     const { puuid: userPUUID } = await kayn.Summoner.by.name(ign).region(server);
     return userPUUID;
+}
+
+async function createFriendShipAndGetFriendsID(firstUserID, secondUserID, server, time) {
+
+    var db = admin.database();
+
+    let friendsID = makeid(10);
+
+    var friendsRef = db.ref("/friends/" + server + "/" + friendsID);
+
+    friendsRef.update({
+        firstUserID: firstUserID,
+        secondUserID: secondUserID,
+        friendsSence: time,
+        status: 'pending',
+    });
+
+    return friendsID;
+}
+
+async function updateNotification(id, server, key, updateArea) {
+    var db = admin.database();
+    var ref = db.ref("/users/" + server + "/" + id + "/notifications/" + key);
+    ref.update(updateArea);
+}
+
+async function addToFriendList(server, id, friendsID) {
+    var db = admin.database();
+    db.ref("/users/" + server + "/" + id + "/friendList").push().set(friendsID);
+}
+
+async function updateFriends(server, id, updateArea) {
+    var db = admin.database();
+    var ref = db.ref("/friends/" + server + "/" + id);
+    ref.update(updateArea);
 }
 
 // Util Function to check if a given Object is empty or not
@@ -529,7 +690,7 @@ async function get10IdsData(givenID, givenServer) {
                         tier: data.child('info').child('solorank').child('tier').val() !== null ? data.child('info').child('solorank').child('tier').val() : 'unranked',
                         rank: data.child('info').child('solorank').child('rank').val(),
                         wr: data.child('info').child('solorank').child('wr').val() !== null ? data.child('info').child('solorank').child('wr').val() : -1,
-                        rankingInfo: userRank,//TODO : get user Rank from db not lol api later
+                        rankingInfo: userRank,
                         matchList: data.child('matchList').val(),
                     };
                     userIDS.push(usersdata);
@@ -637,6 +798,24 @@ async function getUserInfoByID(id, givenServer) {
     })
 }
 
+async function getUserNotificationsByID(id, givenServer) {
+    var db = admin.database();
+    var ref = db.ref("/users/" + givenServer + "/" + id + "/notifications");
+    return new Promise((resolve, reject) => {
+        ref.on('value', snapshot => {
+            var notifications = [];
+            snapshot.forEach(snap => {
+                if (!snap.val().expired) {
+                    notifications.push(snap.val());
+                }
+            });
+            resolve(notifications);
+        }, reject)
+    })
+}
+
+
+
 async function getUserMatchListByID(id, givenServer) {
     var db = admin.database();
     var ref = db.ref("/users/" + givenServer + "/" + id + "/matchList");
@@ -657,20 +836,18 @@ async function getFcmToken(id, givenServer) {
     })
 }
 
-async function addToNotifications(id,server,method,notificationData){
+async function addToNotifications(id, server, key, notificationData) {
     var db = admin.database();
-        var ref = db.ref("/users/" + server + "/" + id +"/notifications");
-        ref.once('value').then(snapshot => {
-            var timestamp = Date.now().toString();
-            var key=timestamp+"_"+method;
-            console.log(key);
-            ref.child(key).set(notificationData);
-            return null;
-        }).catch(() => {
-            let responseBody = {
-                status: 404,
-                message: 'Unsuccessful',
-            };
-            response.send(responseBody);
-        });
+    var ref = db.ref("/users/" + server + "/" + id + "/notifications");
+    ref.once('value').then(snapshot => {
+        console.log(key);
+        ref.child(key).set(notificationData);
+        return null;
+    }).catch(() => {
+        let responseBody = {
+            status: 404,
+            message: 'Unsuccessful',
+        };
+        response.send(responseBody);
+    });
 }
